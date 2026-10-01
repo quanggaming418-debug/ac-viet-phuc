@@ -113,6 +113,7 @@ export default function App() {
               onRefine={handleRefine}
               isRefining={isRefining}
               refinementError={refinementError}
+              originalRequest={originalRequest}
             />
           )}
         </main>

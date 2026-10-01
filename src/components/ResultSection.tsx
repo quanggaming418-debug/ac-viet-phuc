@@ -1,12 +1,14 @@
 import React from 'react';
 import { ShieldCheck, Sparkles, AlertCircle, Palette, Sparkle } from 'lucide-react';
-import { ACOutfitRecommendation, RefinementType } from '../types/recommendation.ts';
+import { ACOutfitRecommendation, OriginalRequest, RefinementType } from '../types/recommendation.ts';
+import { ImagePromptPanel } from './ImagePromptPanel.tsx';
 
 interface ResultSectionProps {
   recommendation: ACOutfitRecommendation;
   onRefine: (refinementType: RefinementType) => void;
   isRefining: boolean;
   refinementError: string | null;
+  originalRequest?: OriginalRequest | null;
 }
 
 export function ResultSection({
@@ -14,6 +16,7 @@ export function ResultSection({
   onRefine,
   isRefining,
   refinementError,
+  originalRequest,
 }: ResultSectionProps) {
   return (
     <section id="result-section" className="py-16 sm:py-24 relative scroll-mt-20">
@@ -205,6 +208,12 @@ export function ResultSection({
 
             </div>
           </div>
+
+          {/* KHU VỰC: HÌNH DUNG BẢN PHỐI & TẠO PROMPT HÌNH ẢNH */}
+          <ImagePromptPanel
+            recommendation={recommendation}
+            originalRequest={originalRequest}
+          />
 
           {/* GIAI ĐOẠN 4: REFINEMENT FLOW (3 Nút điều chỉnh) */}
           <div className="pt-8 border-t border-[#E9E6E1]/70 space-y-4">
