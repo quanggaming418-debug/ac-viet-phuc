@@ -1,14 +1,22 @@
 import React from 'react';
 import { ShieldCheck, Sparkles, AlertCircle, Palette, Sparkle } from 'lucide-react';
-import { ACOutfitRecommendation } from '../types/recommendation.ts';
+import { ACOutfitRecommendation, RefinementType } from '../types/recommendation.ts';
 
 interface ResultSectionProps {
   recommendation: ACOutfitRecommendation;
+  onRefine: (refinementType: RefinementType) => void;
+  isRefining: boolean;
+  refinementError: string | null;
 }
 
-export function ResultSection({ recommendation }: ResultSectionProps) {
+export function ResultSection({
+  recommendation,
+  onRefine,
+  isRefining,
+  refinementError,
+}: ResultSectionProps) {
   return (
-    <section id="result-section" className="py-16 sm:py-24 relative scroll-mt-16">
+    <section id="result-section" className="py-16 sm:py-24 relative scroll-mt-20">
       <div className="max-w-4xl mx-auto px-6">
         
         {/* Main Result Card */}
@@ -119,7 +127,7 @@ export function ResultSection({ recommendation }: ResultSectionProps) {
 
           </div>
 
-          {/* Trọng tâm: GIỮ / REMIX / LƯU Ý (Không dùng mảng màu lớn, dùng white surface + subtle accent) */}
+          {/* Trọng tâm: GIỮ / REMIX / LƯU Ý */}
           <div className="space-y-4 pt-2">
             <div className="pb-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-[#77736E]">
@@ -196,6 +204,64 @@ export function ResultSection({ recommendation }: ResultSectionProps) {
               </div>
 
             </div>
+          </div>
+
+          {/* GIAI ĐOẠN 4: REFINEMENT FLOW (3 Nút điều chỉnh) */}
+          <div className="pt-8 border-t border-[#E9E6E1]/70 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#77736E] block">
+                  Khám phá thêm cùng AC
+                </span>
+                <p className="text-xs text-[#77736E]/80 mt-0.5">
+                  Điều chỉnh bản phối theo hướng bạn mong muốn
+                </p>
+              </div>
+
+              {isRefining && (
+                <div className="inline-flex items-center gap-2 text-xs font-medium text-[#8E3028]">
+                  <span className="w-3.5 h-3.5 border-2 border-[#8E3028]/30 border-t-[#8E3028] rounded-full animate-spin" />
+                  <span>AC đang điều chỉnh bản phối…</span>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                disabled={isRefining}
+                onClick={() => onRefine('more_traditional')}
+                className="px-4 py-3 rounded-full bg-[#FFFFFF] hover:bg-[#FBFBFA] active:bg-[#F5F2EB] border border-[#E9E6E1] hover:border-[#181716]/30 text-sm font-medium text-[#181716] transition-all cursor-pointer disabled:opacity-50 shadow-2xs text-center"
+              >
+                Truyền thống hơn
+              </button>
+
+              <button
+                type="button"
+                disabled={isRefining}
+                onClick={() => onRefine('more_modern')}
+                className="px-4 py-3 rounded-full bg-[#FFFFFF] hover:bg-[#FBFBFA] active:bg-[#F5F2EB] border border-[#E9E6E1] hover:border-[#181716]/30 text-sm font-medium text-[#181716] transition-all cursor-pointer disabled:opacity-50 shadow-2xs text-center"
+              >
+                Biến tấu thêm
+              </button>
+
+              <button
+                type="button"
+                disabled={isRefining}
+                onClick={() => onRefine('alternative')}
+                className="px-4 py-3 rounded-full bg-[#FFFFFF] hover:bg-[#FBFBFA] active:bg-[#F5F2EB] border border-[#8E3028]/40 hover:border-[#8E3028] text-sm font-medium text-[#8E3028] transition-all cursor-pointer disabled:opacity-50 shadow-2xs text-center"
+              >
+                Thử phương án khác
+              </button>
+            </div>
+
+            {/* Error Message for Refinement */}
+            {refinementError && (
+              <div className="p-3.5 rounded-xl bg-[#FBFBFA] border border-[#E9E6E1] text-xs text-[#8E3028] flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{refinementError}</span>
+              </div>
+            )}
           </div>
 
         </div>

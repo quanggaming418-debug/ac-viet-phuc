@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, RotateCcw, AlertCircle, RefreshCw } from 'lucide-react';
-import { ACOutfitRecommendation } from '../types/recommendation.ts';
+import { ACOutfitRecommendation, OriginalRequest } from '../types/recommendation.ts';
 
 const OCCASIONS = [
   'Tết',
@@ -20,7 +20,10 @@ const STYLES = [
 ];
 
 interface InputSectionProps {
-  onRecommendationReceived: (recommendation: ACOutfitRecommendation) => void;
+  onRecommendationReceived: (
+    recommendation: ACOutfitRecommendation,
+    originalRequest: OriginalRequest
+  ) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   errorMessage: string | null;
@@ -43,22 +46,24 @@ export function InputSection({
     setIsLoading(true);
     setErrorMessage(null);
 
+    const requestPayload: OriginalRequest = {
+      userText: prompt.trim(),
+      occasion: selectedOccasion,
+      style: selectedStyle,
+      modernityLevel: modernity,
+    };
+
     try {
       const response = await fetch('/api/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userText: prompt.trim(),
-          occasion: selectedOccasion,
-          style: selectedStyle,
-          modernityLevel: modernity,
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success && data.recommendation) {
-        onRecommendationReceived(data.recommendation);
+        onRecommendationReceived(data.recommendation, requestPayload);
         // Smooth scroll to result section
         setTimeout(() => {
           const resultElement = document.getElementById('result-section');

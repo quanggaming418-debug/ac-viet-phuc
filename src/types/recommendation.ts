@@ -13,3 +13,12 @@ export interface ACOutfitRecommendation {
   remix: string[];
   luuY: string[];
 }
+
+export type RefinementType = 'more_traditional' | 'more_modern' | 'alternative';
+
+export interface OriginalRequest {
+  userText: string;
+  occasion: string;
+  style: string;
+  modernityLevel: number;
+}

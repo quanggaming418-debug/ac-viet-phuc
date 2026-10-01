@@ -7,12 +7,17 @@ import { GarmentsSection } from './components/GarmentsSection.tsx';
 import { InputSection } from './components/InputSection.tsx';
 import { ResultSection } from './components/ResultSection.tsx';
 import { Footer } from './components/Footer.tsx';
-import { ACOutfitRecommendation } from './types/recommendation.ts';
+import { ACOutfitRecommendation, OriginalRequest, RefinementType } from './types/recommendation.ts';
 
 export default function App() {
   const [recommendation, setRecommendation] = useState<ACOutfitRecommendation | null>(null);
+  const [originalRequest, setOriginalRequest] = useState<OriginalRequest | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Refinement states
+  const [isRefining, setIsRefining] = useState<boolean>(false);
+  const [refinementError, setRefinementError] = useState<string | null>(null);
 
   const handleExploreClick = () => {
     const inputElement = document.getElementById('input-section');
@@ -21,8 +26,56 @@ export default function App() {
     }
   };
 
-  const handleRecommendationReceived = (rec: ACOutfitRecommendation) => {
+  const handleRecommendationReceived = (
+    rec: ACOutfitRecommendation,
+    requestPayload: OriginalRequest
+  ) => {
     setRecommendation(rec);
+    setOriginalRequest(requestPayload);
+    setRefinementError(null);
+  };
+
+  const handleRefine = async (refinementType: RefinementType) => {
+    if (!recommendation || isRefining) return;
+    setIsRefining(true);
+    setRefinementError(null);
+
+    try {
+      const response = await fetch('/api/refine-advisor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalRequest: originalRequest || {
+            userText: '',
+            occasion: 'Tết',
+            style: 'Thanh lịch',
+            modernityLevel: 50,
+          },
+          currentRecommendation: recommendation,
+          refinementType,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success && data.recommendation) {
+        setRecommendation(data.recommendation);
+        // Smooth scroll back to top of Result Section
+        setTimeout(() => {
+          const resultElement = document.getElementById('result-section');
+          if (resultElement) {
+            resultElement.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+      } else {
+        setRefinementError('AC chưa thể điều chỉnh bản phối lúc này. Hãy thử lại.');
+      }
+    } catch (err) {
+      console.error('[AC Refinement] Error during refinement request:', err);
+      setRefinementError('AC chưa thể điều chỉnh bản phối lúc này. Hãy thử lại.');
+    } finally {
+      setIsRefining(false);
+    }
   };
 
   return (
@@ -53,9 +106,14 @@ export default function App() {
             setErrorMessage={setErrorMessage}
           />
 
-          {/* Section F: Kết quả gợi ý từ Gemini thật (khi có kết quả) */}
+          {/* Section F: Kết quả gợi ý từ Gemini thật & Nút Refinement */}
           {recommendation && (
-            <ResultSection recommendation={recommendation} />
+            <ResultSection 
+              recommendation={recommendation}
+              onRefine={handleRefine}
+              isRefining={isRefining}
+              refinementError={refinementError}
+            />
           )}
         </main>
 
