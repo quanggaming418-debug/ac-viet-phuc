@@ -1,0 +1,6 @@
+{
+  "name": "AC",
+  "description": "Trợ lý AI giúp người trẻ tìm hiểu và phối Việt phục theo dịp, phong cách cá nhân và mức độ truyền thống/hiện đại mong muốn.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
