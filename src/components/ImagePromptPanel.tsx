@@ -313,7 +313,7 @@ export function ImagePromptPanel({
           </div>
 
           <p className="text-[11px] text-[#77736E] italic leading-normal">
-            * Mẹo: Prompt đã sẵn sàng. Bạn có thể sao chép hoặc chọn một công cụ AI phía trên để tạo hình ảnh minh họa cho bản phối.
+            * Mẹo: Prompt đã sẵn sàng. Bạn có thể sao chép hoặc mở nhanh bằng Gemini / ChatGPT phía trên để tạo hình ảnh.
           </p>
         </div>
       )}
