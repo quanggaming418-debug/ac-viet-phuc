@@ -167,3 +167,19 @@ Trước mỗi task:
 6. Sau implementation, chạy test phù hợp.
 7. Review regression, security và scope trước khi coi task hoàn thành.
 8. Chỉ đề xuất Git commit khi phiên bản đang chạy ổn định.
+
+## 13. Visual Generation Reference
+
+Mọi task liên quan tới:
+- image prompt generation
+- visual preview
+- external AI image tools
+- image reference
+- future image generation API
+- future user-photo visualization
+
+phải đọc:
+
+`docs/VISUAL_GENERATION_GUIDE.md`
+
+trước khi sửa code.

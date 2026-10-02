@@ -100,14 +100,13 @@ Không được trình bày các yếu tố này như một quy tắc truyền t
 Prompt sinh ra phải ưu tiên cấu trúc sau:
 
 1. Hình ảnh cần tạo
-2. Đặc điểm nhận diện cần giữ
-3. Phong cách và mức độ hiện đại
+2. Đặc điểm nhận diện cốt lõi cần giữ (phân định rõ: đặc điểm cần thể hiện rõ trong hình ảnh & đặc điểm cấu trúc cần tôn trọng)
+3. Phong cách và mức độ hiện đại (chỉ dẫn tạo hình styling, không phải thước đo lịch sử)
 4. Bảng màu và cách phân bổ màu
-5. Phụ kiện được phép
-6. Đạo cụ / vật cầm tay
-7. Người mẫu và bố cục
-8. Chất liệu / cảm giác bề mặt
-9. Những điều cần tránh
+5. Phụ kiện / vật phẩm được phép xuất hiện (Allowed visual items model)
+6. Yêu cầu người mẫu và bố cục (Bắt buộc toàn thân)
+7. Cảm nhận chất liệu bề mặt (Trung tính, không bịa lịch sử)
+8. Những điều cần tránh (Negative prompt chuyên biệt theo từng dáng phục)
 
 Không tự thay đổi cấu trúc này nếu task hiện tại không yêu cầu.
 
@@ -135,27 +134,29 @@ Các thuật ngữ tiếng Anh có thể giữ khi cần:
 
 # 4. Quy tắc riêng theo từng loại Việt phục
 
+### Phân loại GIỮ cho mục đích visual prompt
+Để tránh kỳ vọng phi thực tế rằng mọi chi tiết cấu tạo bên trong đều phải nhìn thấy từ một góc chụp thời trang đơn diện, prompt phân biệt rõ:
+- **Đặc điểm cần thể hiện rõ trong hình ảnh (Visually observable):** Các yếu tố ngoại diện có thể nhìn thấy từ ảnh toàn thân phía trước.
+- **Đặc điểm cấu trúc cần được tôn trọng trong thiết kế (Structural):** Các yếu tố cấu trúc bên trong/phía sau cần được model tôn trọng trong tỷ lệ và cấu tạo tổng thể, nhưng không yêu cầu tạo chi tiết giả hay góc nhìn phi tự nhiên (cutaway/x-ray).
+
+### Nguyên tắc style-neutral cho garment guidance
+Chỉ dẫn thị giác theo từng dáng phục phải trung tính về mặt thẩm mỹ (style-neutral). Tuyệt đối không hard-code các tính từ phong cách như “mộc mạc”, “nữ tính”, “cổ điển”, “thanh lịch” vào phần mô tả trang phục vì sẽ xung đột với các concept cá tính hoặc hiện đại mạnh. Phong cách thẩm mỹ thuộc về `style`, `modernityLevel` và `conceptName`.
+
 ## 4.1. Áo ngũ thân tay chẽn
 
-### Core GIỮ
+### Core GIỮ & Phân loại thị giác
+- **Đặc điểm cần thể hiện rõ trong hình ảnh:**
+  - Cổ đứng/lập lĩnh
+  - Tay thu về cổ tay
+  - Phom truyền thống không bodycon mạnh
+- **Đặc điểm cấu trúc cần được tôn trọng trong thiết kế:**
+  - Cấu trúc năm thân
+  - Có thân thứ năm phía trong phần trước
 
-Chỉ được sử dụng các đặc điểm sau nếu chúng xuất hiện trong recommendation / whitelist:
-
-- Cấu trúc năm thân
-- Có thân thứ năm phía trong phần trước
-- Cổ đứng/lập lĩnh
-- Tay thu về cổ tay
-- Phom truyền thống không bodycon mạnh
-
-### Visual direction
-
-Prompt có thể diễn đạt trực quan:
-
-- cổ đứng phải nhìn rõ;
-- tay thu dần về cổ tay;
-- silhouette không bó sát cơ thể;
-- trang phục không được biến thành modern bodycon áo dài;
-- ưu tiên nhìn rõ toàn bộ form.
+### Visual direction (Style-neutral)
+- Cổ đứng/lập lĩnh cần nhìn rõ ràng, thẳng thớm;
+- Tay áo thu gọn dần và ôm vừa vặn về phía cổ tay (không loe, không fantasy);
+- Silhouette trang phục buông tự nhiên theo phom truyền thống, tuyệt đối không ôm sát chiết eo kiểu áo dài hiện đại (bodycon fit).
 
 Không tự thêm:
 - quy tắc khuy;
@@ -164,9 +165,6 @@ Không tự thêm:
 - phụ kiện truyền thống nếu recommendation không có.
 
 ### Avoid list tối thiểu
-
-Có thể dùng:
-
 - không biến thành áo dài hiện đại ôm sát;
 - không biến thành qipao / cheongsam;
 - không biến thành hanfu;
@@ -178,36 +176,23 @@ Có thể dùng:
 
 ## 4.2. Áo tứ thân
 
-### Core GIỮ
+### Core GIỮ & Phân loại thị giác
+- **Đặc điểm cần thể hiện rõ trong hình ảnh:**
+  - Hai vạt trước riêng/mở
+- **Đặc điểm cấu trúc cần được tôn trọng trong thiết kế:**
+  - Cấu trúc bốn thân
+  - Hai phần phía sau ghép dọc sống lưng
 
-- Cấu trúc bốn thân
-- Hai phần phía sau ghép dọc sống lưng
-- Hai vạt trước riêng/mở
-
-### Visual direction
-
-Prompt có thể diễn đạt:
-
-- hai vạt trước phải nhìn thấy rõ là tách rời / mở;
-- silhouette cần giúp người xem nhận ra cấu trúc layering;
-- không biến thành áo dài hiện đại;
-- không đóng kín phần trước nếu điều đó làm mất nhận diện hai vạt trước.
+### Visual direction (Style-neutral)
+- Hai vạt trước phải nhìn thấy rõ ràng là tách rời và mở tự nhiên;
+- Silhouette cần thể hiện rõ các lớp phối (layering) và không để cách styling che khuất nhận diện hai vạt trước riêng/mở;
+- Không may đóng kín phần trước làm mất nhận diện hai vạt trước.
 
 ### Nguyên tắc quan trọng
-
 Áo tứ thân không được đồng nhất với Quan họ.
-
-Không mặc định:
-- nón quai thao;
-- yếm;
-- khăn mỏ quạ;
-- phụ kiện Quan họ;
-- bối cảnh Quan họ
-
-nếu recommendation không có.
+Không mặc định: nón quai thao, yếm, khăn mỏ quạ, phụ kiện Quan họ, bối cảnh Quan họ nếu recommendation không có.
 
 ### Avoid list tối thiểu
-
 - không biến thành áo dài hiện đại;
 - không biến thành hanfu;
 - không biến thành fantasy costume;
@@ -218,43 +203,28 @@ nếu recommendation không có.
 
 ## 4.3. Áo tấc
 
-### Core GIỮ
+### Core GIỮ & Phân loại thị giác
+- **Đặc điểm cần thể hiện rõ trong hình ảnh:**
+  - Tay rộng/thụng
+- **Đặc điểm cấu trúc cần được tôn trọng trong thiết kế:**
+  - Cấu trúc năm thân
 
-- Cấu trúc năm thân
-- Tay rộng/thụng
+*(Lưu ý: Không tự thêm “cổ đứng/lập lĩnh” vào GIỮ nếu recommendation không có).*
 
-Không tự thêm “cổ đứng/lập lĩnh” vào GIỮ nếu recommendation không có.
-
-### Visual direction
-
-Tay rộng/thụng phải là đặc điểm thị giác rõ ràng.
-
-Prompt phải truyền đạt được cả ngưỡng dưới và ngưỡng trên:
-
-- tay phải rộng rõ hơn tay áo dài hiện đại;
-- không được thu hẹp đến mức mất nhận diện;
+### Visual direction (Style-neutral)
+Tay rộng/thụng phải là đặc điểm thị giác nhận thấy rõ ràng ngay khi nhìn toàn thân:
+- tay phải rộng rõ hơn tay áo dài hiện đại thông thường;
+- không được thu hẹp đến mức mất nhận diện tay thụng;
 - vẫn phải cân đối với vóc dáng người mẫu;
-- không được phóng đại thành tay cánh dơi;
-- không được biến thành oversized fantasy sleeves.
-
-Silhouette:
-- dài;
-- rõ;
-- thanh thoát;
-- dễ quan sát toàn thân.
-
-Bề mặt:
-- sạch;
-- tiết chế;
-- không phủ hoa văn dày đặc nếu recommendation không yêu cầu.
+- không được phóng đại thành tay cánh dơi hoặc oversized fantasy sleeves.
+Silhouette: dài, thanh thoát, dễ quan sát toàn thân.
+Bề mặt: sạch, tiết chế, hạn chế tối đa hoa văn dày đặc, tránh cảm giác phục trang tuồng cổ hoặc costume sân khấu.
 
 ### Avoid list tối thiểu
-
 - không biến thành áo dài hiện đại bodycon;
 - không biến thành qipao / cheongsam;
 - không biến thành hanfu;
-- không biến thành fantasy costume;
-- không biến thành stage costume;
+- không biến thành fantasy costume / stage costume;
 - không thu hẹp tay áo làm mất tay thụng;
 - không phóng đại tay thành cánh dơi;
 - không phủ trang trí dày đặc;
@@ -264,51 +234,42 @@ Bề mặt:
 
 # 5. Quy tắc theo modernityLevel
 
-`modernityLevel` chỉ là chỉ báo về mức độ biến tấu trong styling.
+`modernityLevel` chỉ là chỉ báo về mức độ biến tấu trong styling, định hướng cách phối đương đại.
 
-Không phải thang đo lịch sử.
+Tuyệt đối KHÔNG phải:
+- authenticity score (điểm xác thực)
+- historical accuracy score (điểm chính xác lịch sử)
+- cultural correctness score (điểm chuẩn mực văn hóa)
+
+Tuyệt đối không dùng các từ ngữ áp đặt như: “chuẩn mực”, “chuẩn nhất”, “đúng chuẩn”, “nguyên bản tuyệt đối”, “phục dựng” hay “xác thực lịch sử”.
 
 ## 0–20: Rất gần truyền thống
-
 Định hướng:
-- tổng thể tiết chế;
-- hạn chế biến tấu mạnh;
-- ưu tiên form rõ;
-- ít phụ kiện hiện đại;
-- ít hoa văn;
-- không fashion-forward quá mức.
+- tổng thể tiết chế, hạn chế tối đa các biến tấu styling mạnh và giữ rõ các đặc điểm GIỮ cùng silhouette đã mô tả;
+- ưu tiên bề mặt vải trơn hoặc rất ít hoa văn trang trí;
+- không dùng phụ kiện mang cảm giác hiện đại phá cách;
+- không tạo cảm giác fashion-forward quá mức.
 
 ## 21–40: Truyền thống chiếm ưu thế
-
 Định hướng:
-- giữ nhận diện mạnh;
-- có thể thay đổi nhẹ màu hoặc phụ kiện;
-- styling hiện đại ở mức thấp.
+- giữ vững nhận diện trang phục cốt lõi;
+- có thể thay đổi nhẹ ở sắc thái màu hoặc phụ kiện tinh giản;
+- mức độ hiện đại ở mức thấp và chừng mực.
 
 ## 41–60: Cân bằng
-
 Định hướng:
 - cân bằng giữa GIỮ và REMIX;
-- màu sắc và phụ kiện có thể hiện đại hơn;
+- màu sắc và phụ kiện có thể trẻ trung, thanh lịch hơn;
 - form cốt lõi không thay đổi.
 
 ## 61–80: Hiện đại rõ
-
 Định hướng:
-- hiện đại hóa mạnh hơn ở palette, phụ kiện, styling;
-- vẫn giữ toàn bộ GIỮ.
+- hiện đại hóa rõ nét ở bảng màu, phụ kiện, tinh thần styling trẻ trung, phóng khoáng;
+- vẫn bảo toàn toàn bộ GIỮ.
 
 ## 81–100: Hiện đại mạnh
-
 Định hướng:
-- cho phép sáng tạo mạnh ở:
-  - màu;
-  - phụ kiện;
-  - mood;
-  - cách phối;
-  - concept;
-
-nhưng:
+- cho phép sáng tạo nổi bật về bảng màu, phụ kiện đương đại, concept và thần thái thời trang cá tính;
 - không thay đổi GIỮ;
 - không phá silhouette cốt lõi;
 - không biến garment thành loại trang phục khác.
@@ -320,103 +281,37 @@ nhưng:
 Nếu recommendation có 3 màu:
 
 ## Màu 1
-Là màu chủ đạo.
-
-Phải chiếm phần lớn diện tích trang phục.
+Là màu chủ đạo. Phải chiếm phần lớn diện tích trang phục (áo chính).
 
 ## Màu 2
-Là màu phụ.
-
-Chỉ dùng ở:
-- lớp phụ;
-- viền;
-- phần lót;
-- mảng nhỏ có kiểm soát.
+Là màu phụ. Chỉ xuất hiện hỗ trợ ở lớp lót, đường viền, hoặc mảng phối thứ cấp có kiểm soát.
 
 ## Màu 3
-Là màu điểm nhấn.
-
-Dùng với tỷ lệ nhỏ.
-
-Không được:
-- lấn át màu chính;
-- khiến toàn bộ trang phục đổi thành màu này;
-- biến chất liệu thành ánh kim toàn thân nếu màu 3 là metallic.
-
-Prompt phải mô tả rõ vai trò từng màu.
+Là màu điểm nhấn. Dùng với diện tích rất nhỏ (chi tiết trang trí nhẹ hoặc phụ kiện). Tuyệt đối không để lấn át màu chủ đạo hay biến toàn bộ trang phục thành màu này.
 
 ---
 
-# 7. Phụ kiện và đạo cụ
+# 7. Phụ kiện và vật phẩm được phép (Allowed Visual Items Model)
 
-## 7.1. Phụ kiện
+Trong phiên bản hiện tại, schema của AC chỉ có một trường dữ liệu duy nhất là `recommendation.accessories` và chưa có trường `props` riêng.
 
-Accessory chỉ được lấy từ:
+Vì vậy:
+- Image prompt KHÔNG tự phân loại các món đồ thành “wearable accessory” (mặc trên người) hay “handheld prop” (vật cầm tay) dựa trên từ khóa hay suy diễn ngữ nghĩa (dễ dẫn tới mâu thuẫn như: Quạt giấy hay Túi cói được phép nhưng lại bị ghi "Đạo cụ cầm tay: none").
+- Toàn bộ các món do `recommendation.accessories` cung cấp được coi chung là **Allowed Visual Items (Phụ kiện / vật phẩm được phép xuất hiện)**.
 
-`recommendation.accessories`
+## Nguyên tắc:
+1. `ALLOWED ITEMS = recommendation.accessories`
+2. `EVERYTHING ELSE = Do not invent.`
 
-Không tự thêm:
-- khăn;
-- mũ;
-- trâm;
-- quạt;
-- túi;
-- giày;
-- trang sức;
-- hoa;
-- đạo cụ chụp ảnh
+## Cách diễn đạt trong prompt:
+- Nếu có accessories:
+  `Phụ kiện / vật phẩm được phép xuất hiện: [danh sách accessories].`
+  `Chỉ sử dụng đúng các phụ kiện / vật phẩm đã liệt kê ở trên. Tuyệt đối không tự thêm bất kỳ phụ kiện, vật cầm tay, đạo cụ chụp ảnh hoặc chi tiết bối cảnh nào khác ngoài danh sách được phép.`
+- Nếu accessories rỗng:
+  `Phụ kiện / vật phẩm được phép xuất hiện: Không có phụ kiện / vật phẩm bổ sung được yêu cầu.`
+  `Tuyệt đối không tự thêm phụ kiện, vật cầm tay, đạo cụ chụp ảnh hoặc chi tiết bối cảnh nào ngoài trang phục chính.`
 
-nếu không có trong recommendation.
-
----
-
-## 7.2. Đạo cụ
-
-Phụ kiện và đạo cụ là hai nhóm khác nhau.
-
-### Phụ kiện
-Là những thứ mặc / đeo / đi cùng trang phục.
-
-Ví dụ:
-- kính
-- giày
-- túi
-- khăn đóng
-- trâm
-
-### Đạo cụ
-Là vật cầm tay hoặc vật dùng cho bối cảnh chụp ảnh.
-
-Ví dụ:
-- bằng tốt nghiệp
-- mũ cử nhân
-- bó hoa
-- sách
-- quạt cầm tay
-- bảng
-- ghế
-- props trang trí
-
-Nếu prompt không yêu cầu đạo cụ:
-
-`Props allowed: none`
-
----
-
-## 7.3. Quy tắc bất biến
-
-Một item đã nằm trong danh sách accessory được phép:
-- tuyệt đối không được xuất hiện trong forbidden list.
-
-Không được sinh prompt kiểu:
-
-Allowed:
-- khăn đóng
-
-Forbidden:
-- khăn đóng
-
-Đây là lỗi logic nghiêm trọng.
+Quy tắc này loại bỏ hoàn toàn hệ thống classifier từ khóa phức tạp và triệt tiêu 100% nguy cơ tự mâu thuẫn.
 
 ---
 
@@ -560,23 +455,25 @@ Kiểm tra:
 
 ---
 
-# 13. Checklist audit prompt
+# 13. Phân biệt kiểm thử: PROMPT-LEVEL PASS vs IMAGE-LEVEL PASS
 
-Sau khi sinh prompt test, coding agent phải tự kiểm:
+Quy trình QA thị giác phân biệt rạch ròi 2 cấp độ kiểm thử:
 
-- [ ] Có historical fact nào không được phép không?
-- [ ] Có phụ kiện nào được phép nhưng lại bị cấm không?
-- [ ] Có đạo cụ nào tự thêm không?
-- [ ] GIỮ có đúng whitelist không?
-- [ ] modernityLevel có được dùng như styling direction, không phải lịch sử?
-- [ ] màu chính/phụ/nhấn có đúng vai trò?
-- [ ] full-body có đủ cụ thể?
-- [ ] avoid list có tự mâu thuẫn không?
-- [ ] prompt có lặp quá nhiều không?
-- [ ] prompt có vô tình kéo garment sang hanfu/qipao/áo dài không?
+### PROMPT-LEVEL PASS (Cấp độ sinh Prompt)
+Đánh giá tính đúng đắn logic của văn bản prompt sinh ra từ `buildImagePrompt()`:
+- Đủ các thành phần theo cấu trúc chuẩn.
+- Phân biệt rõ đặc điểm nhận diện cần thể hiện (observable) và đặc điểm cấu trúc cần tôn trọng (structural).
+- Không tự bịa historical fact; không dùng từ ngữ áp đặt tính chính xác lịch sử ("chuẩn mực", "phục dựng").
+- Allowed visual items lấy 100% từ `recommendation.accessories`, triệt tiêu hoàn toàn mâu thuẫn phụ kiện/đạo cụ.
+- Modernity level nằm đúng dải ngữ nghĩa styling và không phá vỡ GIỮ.
+- Full-body có đủ các ràng buộc thị giác chặt chẽ.
+- Không tự Quan họ hóa Áo tứ thân; không tự thêm cổ đứng cho Áo tấc.
+- Garment visual guidance hoàn toàn trung tính về phong cách (style-neutral).
 
-Nếu bất kỳ mục nào FAIL:
-không được báo task hoàn thành.
+*Lưu ý:* Việc prompt-level đạt PASS chỉ xác nhận rằng **văn bản chỉ dẫn cho AI đã chuẩn xác và không mâu thuẫn**, KHÔNG đồng nghĩa với việc hình ảnh do AI vẽ ra chắc chắn đúng 100%.
+
+### IMAGE-LEVEL PASS (Cấp độ hình ảnh tạo ra)
+Chỉ được đánh giá sau khi người dùng hoặc tester sao chép prompt và đưa vào mô hình AI tạo ảnh thực tế (Gemini, ChatGPT) và kiểm tra file ảnh kết quả theo Checklist mục 14.
 
 ---
 
