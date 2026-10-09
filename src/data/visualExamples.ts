@@ -44,78 +44,78 @@ export const VISUAL_EXAMPLES: VisualExample[] = [
   {
     garmentType: 'Áo ngũ thân tay chẽn',
     modernityBand: 'traditional',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-ngu-than-tay-chen.png',
     alt: 'Minh họa Áo ngũ thân tay chẽn theo phong cách truyền thống',
     bandLabel: 'Truyền thống hơn',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo ngũ thân tay chẽn',
   },
   {
     garmentType: 'Áo ngũ thân tay chẽn',
     modernityBand: 'balanced',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-ngu-than-tay-chen.png',
     alt: 'Minh họa Áo ngũ thân tay chẽn kết hợp cân bằng giữa cổ điển và đương đại',
     bandLabel: 'Cân bằng',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo ngũ thân tay chẽn',
   },
   {
     garmentType: 'Áo ngũ thân tay chẽn',
     modernityBand: 'contemporary',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-ngu-than-tay-chen.png',
     alt: 'Minh họa Áo ngũ thân tay chẽn theo phong cách hiện đại tối giản',
     bandLabel: 'Hiện đại hơn',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo ngũ thân tay chẽn',
   },
 
   // 2. Áo tứ thân
   {
     garmentType: 'Áo tứ thân',
     modernityBand: 'traditional',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-tu-than.png',
     alt: 'Minh họa Áo tứ thân phom dáng truyền thống mộc mạc',
     bandLabel: 'Truyền thống hơn',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo tứ thân',
   },
   {
     garmentType: 'Áo tứ thân',
     modernityBand: 'balanced',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-tu-than.png',
     alt: 'Minh họa Áo tứ thân phối màu thanh nhã đương đại',
     bandLabel: 'Cân bằng',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo tứ thân',
   },
   {
     garmentType: 'Áo tứ thân',
     modernityBand: 'contemporary',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-tu-than.png',
     alt: 'Minh họa Áo tứ thân ứng dụng phong cách tối giản',
     bandLabel: 'Hiện đại hơn',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo tứ thân',
   },
 
   // 3. Áo tấc
   {
     garmentType: 'Áo tấc',
     modernityBand: 'traditional',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-tac.png',
     alt: 'Minh họa Áo tấc tay thụng phom dáng truyền thống trang nghiêm',
     bandLabel: 'Truyền thống hơn',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo tấc',
   },
   {
     garmentType: 'Áo tấc',
     modernityBand: 'balanced',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-tac.png',
     alt: 'Minh họa Áo tấc phối màu nhã nhặn cho dịp lễ hội đương đại',
     bandLabel: 'Cân bằng',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo tấc',
   },
   {
     garmentType: 'Áo tấc',
     modernityBand: 'contemporary',
-    imageSrc: '', // Chờ asset thật được kiểm tra văn hóa
+    imageSrc: '/assets/ao-tac.png',
     alt: 'Minh họa Áo tấc kết hợp phụ kiện và màu sắc trẻ trung',
     bandLabel: 'Hiện đại hơn',
-    sourceLabel: 'AC Archive (Đang cập nhật)',
+    sourceLabel: 'AC Archive - Áo tấc',
   },
 ];
 

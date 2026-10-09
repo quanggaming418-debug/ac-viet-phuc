@@ -20,12 +20,12 @@
   - Server-side Gemini recommendation với structured output chuẩn.
   - Ba trụ cột định hình: GIỮ (nhận diện cốt lõi theo whitelist), REMIX (biến tấu đương đại), LƯU Ý (cân nhắc thực tế).
   - Refinement flow 3 nút: "Truyền thống hơn", "Biến tấu thêm", "Thử phương án khác" (gọi Gemini thật, tự cập nhật kết quả).
+  - Tích hợp tạo hình ảnh bản phối trực tiếp qua EvoLink Image Generation API (proxy server-side bảo mật EVOLINK_API_KEY).
 - **Out of Scope (Chưa triển khai):**
-  - Tạo ảnh AI / AI image generation.
   - Upload ảnh người dùng.
   - Authentication / Login / User profile.
   - Database lưu trữ dữ liệu (PostgreSQL, Firestore, v.v.).
-  - Lưu lịch sử bản phối, chia sẻ social, dữ liệu thời tiết, giỏ hàng thương mại điện tử.
+  - Lưu lịch sử bản phối lâu dài trên cloud, chia sẻ social, dữ liệu thời tiết, giỏ hàng thương mại điện tử.
 
 ## 3. Architecture
 - **Frontend:** React 19 SPA chạy trên nền Vite + Tailwind CSS v4, Lucide React icons, TypeScript.
@@ -70,6 +70,10 @@
   - **Mục đích:** Điều chỉnh bản phối theo 1 trong 3 hướng: `more_traditional`, `more_modern`, hoặc `alternative`.
   - **Input:** `{ originalRequest: OriginalRequest, currentRecommendation: ACOutfitRecommendation, refinementType: RefinementType }`
   - **Output:** `{ success: boolean, recommendation: ACOutfitRecommendation }` (hoặc lỗi HTTP 400/500).
+- `POST /api/generate-image`
+  - **Mục đích:** Proxy tạo hình ảnh trực tiếp từ prompt thông qua EvoLink AI (`qwen-image-3.0-pro`), bảo mật `EVOLINK_API_KEY`.
+  - **Input:** `{ prompt: string, model?: string }`
+  - **Output:** `{ success: boolean, taskId: string, imageUrl: string, model: string, status: string }` (hoặc `{ success: false, error: { code: string, message: string } }`).
 
 ## 6. Gemini Flow
 1. **Frontend gửi dữ liệu:** `InputSection` hoặc `ResultSection` gửi thông tin nhu cầu + bản phối hiện tại đến Express API.

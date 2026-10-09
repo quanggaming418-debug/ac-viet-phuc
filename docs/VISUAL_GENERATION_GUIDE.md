@@ -569,23 +569,20 @@ nếu chưa test thực tế.
 
 # 18. Trạng thái hiện tại của visual workflow
 
-Hiện tại AC sử dụng:
+AC hỗ trợ quy trình tạo ảnh trực tiếp:
 
 Recommendation
 → `buildImagePrompt()`
-→ User copy prompt
-→ User mở Gemini hoặc ChatGPT
-→ User paste prompt
-→ External AI tạo ảnh
+→ Gửi prompt trực tiếp tới EvoLink Image Generation API qua server-side proxy (`POST /api/generate-image`)
+→ Server theo dõi task (`GET /v1/tasks/{task_id}`)
+→ Hiển thị ảnh thời trang thật trực tiếp trên giao diện website
+→ Cho phép tải ảnh về, tạo lại hoặc mở xem prompt chi tiết đã dùng.
 
 Hiện tại chưa có:
-- image generation API trong AC;
 - virtual try-on production;
 - user-photo visualization production;
 - Blender / 3D engine;
 - automatic image validation.
-
-Các phần này chỉ được thêm khi có task riêng và được duyệt.
 
 ---
 

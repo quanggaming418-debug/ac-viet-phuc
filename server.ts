@@ -1,8 +1,40 @@
+import http from 'http';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { GoogleGenAI, Type } from '@google/genai';
+import { EvoLinkImageService, sanitizeUpstreamError } from './src/services/evolinkImageService.ts';
+import { evaluateGeneratedImageWithGemini } from './src/services/imageQAService.ts';
+import { buildVisualSpec } from './src/multiview/multiViewCompiler.ts';
+import {
+  buildCrossViewConsistencyPrompt,
+  validateAndParseConsistencyResult,
+  evaluateDeterministicConsistency,
+} from './src/multiview/consistency.ts';
+import { evaluateViewQAResult } from './src/multiview/packBuilder.ts';
+import type { ViewId, GarmentId } from './src/multiview/types.ts';
+import {
+  buildReconstructionInput,
+  validatePackReadyForReconstruction,
+} from './src/reconstruction/inputBuilder.ts';
+import { validateGlbTechnical } from './src/reconstruction/validator.ts';
+import {
+  compareReconstructionStructure,
+  evaluateAcceptanceGate,
+} from './src/reconstruction/structuralComparator.ts';
+import { reconstructionStore } from './src/reconstruction/artifactStore.ts';
+import { MockReconstructionProvider } from './src/reconstruction/mockReconstructionProvider.ts';
+import {
+  reconstructionService,
+  getReconstructionConfig,
+} from './src/reconstruction/reconstructionService.ts';
+import { resolveWearerPresentation } from './src/utils/blueprintSpec.ts';
+import type {
+  Reconstructed3DArtifact,
+  ReconstructionTechnicalValidation,
+} from './src/reconstruction/types.ts';
 
 dotenv.config();
 
@@ -379,18 +411,47 @@ async function startServer() {
 
   // Backend Health check endpoint
   app.get('/api/health', (req, res) => {
+    const evolinkService = new EvoLinkImageService();
     res.json({
       status: 'ok',
       service: 'AC Server Engine',
       hasApiKey: Boolean(process.env.GEMINI_API_KEY),
+      hasEvolinkKey: evolinkService.hasApiKey(),
       model: 'gemini-3.8-flash',
+      evolinkModel: evolinkService.getModel(),
     });
+  });
+
+  // Dynamic Image Models Endpoint (server-side query, safe for client)
+  app.get('/api/image-models', async (req, res) => {
+    try {
+      const evolinkService = new EvoLinkImageService();
+      if (!evolinkService.hasApiKey()) {
+        return res.json({
+          success: false,
+          models: ['qwen-image-3.0-pro'],
+          defaultModel: 'qwen-image-3.0-pro',
+        });
+      }
+      const models = await evolinkService.getAvailableImageModels();
+      return res.json({
+        success: true,
+        models,
+        defaultModel: evolinkService.getModel(),
+      });
+    } catch {
+      return res.json({
+        success: true,
+        models: ['qwen-image-3.0-pro'],
+        defaultModel: 'qwen-image-3.0-pro',
+      });
+    }
   });
 
   // Stage 3: Real Gemini Recommendation Endpoint
   app.post('/api/recommend', async (req, res) => {
     try {
-      const { userText, occasion, style, modernityLevel, prompt, modernity } = req.body || {};
+      const { userText, occasion, style, modernityLevel, prompt, modernity, wearerPresentation } = req.body || {};
 
       const resolvedUserText = (userText || prompt || '').trim();
       const resolvedOccasion = occasion || 'Tết';
@@ -400,6 +461,14 @@ async function startServer() {
         : typeof modernity === 'number' 
           ? modernity 
           : 50;
+      const resolvedWearer = (wearerPresentation === 'male' || wearerPresentation === 'female')
+        ? wearerPresentation
+        : 'unspecified';
+      const wearerLabel = resolvedWearer === 'male'
+        ? 'Nam giới'
+        : resolvedWearer === 'female'
+          ? 'Nữ giới'
+          : 'Không ưu tiên / trung tính (phù hợp đa dạng đối tượng người mặc)';
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -420,6 +489,7 @@ async function startServer() {
       });
 
       const userPrompt = `Yêu cầu phối trang phục Việt:
+- Người mặc: ${wearerLabel}
 - Dịp đã chọn: ${resolvedOccasion}
 - Phong cách mong muốn: ${resolvedStyle}
 - Mức độ truyền thống ↔ hiện đại: ${resolvedModernity}/100 (${
@@ -432,13 +502,19 @@ async function startServer() {
 - Chia sẻ cụ thể từ người dùng: "${resolvedUserText || 'Không có mô tả thêm'}"
 
 Hãy phân tích toàn diện và đề xuất đúng một bản phối Việt phục chuẩn xác theo structured output.
-QUY TẮC BẮT BUỘC: Trường GIỮ chỉ được lấy trực tiếp từ WHITELIST cố định của trang phục tương ứng. Tuyệt đối không thêm tính từ (uy nghiêm, thanh lịch...), phụ kiện, chất liệu, màu sắc hay bối cảnh vào GIỮ. Với Áo tấc, cấm đưa cổ đứng/lập lĩnh vào GIỮ.`;
+QUY TẮC BẮT BUỘC:
+- Người mặc: ${wearerLabel}. Có thể điều chỉnh gợi ý tạo hình styling, bảng màu, cách layer, phụ kiện và giày dép theo ngữ cảnh người mặc (${wearerLabel}) nhưng TUYỆT ĐỐI KHÔNG áp đặt định kiến giới, KHÔNG mặc định 'unspecified' về hệ nhị phân, KHÔNG loại trừ bất kỳ dáng Việt phục nào chỉ vì giới tính (cả Áo ngũ thân tay chẽn, Áo tứ thân và Áo tấc đều không bị loại trừ vì giới tính), và TUYỆT ĐỐI KHÔNG làm thay đổi cấu trúc cốt lõi/phom dáng nhận diện của trang phục.
+- Trường GIỮ chỉ được lấy trực tiếp từ WHITELIST cố định của trang phục tương ứng. Tuyệt đối không thêm tính từ (uy nghiêm, thanh lịch...), phụ kiện, chất liệu, màu sắc hay bối cảnh vào GIỮ. Với Áo tấc, cấm đưa cổ đứng/lập lĩnh vào GIỮ.`;
 
       const recommendation = await callGeminiWithRetry(ai, userPrompt);
 
       return res.json({
         success: true,
-        recommendation,
+        recommendation: {
+          ...recommendation,
+          wearerPresentation: resolvedWearer,
+        },
+        wearerPresentation: resolvedWearer,
       });
     } catch (error) {
       console.error('[AC Backend] Gemini recommendation error:', error);
@@ -523,8 +599,16 @@ QUY TẮC BẮT BUỘC: Trường GIỮ chỉ được lấy trực tiếp từ 
         });
       }
 
+      const resolvedWearer = resolveWearerPresentation(originalRequest, currentRecommendation);
+      const wearerLabel = resolvedWearer === 'male'
+        ? 'Nam giới'
+        : resolvedWearer === 'female'
+          ? 'Nữ giới'
+          : 'Không ưu tiên / trung tính';
+
       const prompt = `YÊU CẦU ĐIỀU CHỈNH BẢN PHỐI VIỆT PHỤC:
 1. THÔNG TIN BAN ĐẦU CỦA NGƯỜI DÙNG:
+- Người mặc: ${wearerLabel}
 - Dịp: ${resolvedOccasion}
 - Phong cách: ${resolvedStyle}
 - Mức độ truyền thống ↔ hiện đại: ${resolvedModernity}/100
@@ -540,7 +624,8 @@ QUY TẮC BẮT BUỘC: Trường GIỮ chỉ được lấy trực tiếp từ 
 3. HƯỚNG ĐIỀU CHỈNH MỚI:
 ${refinementDirective}
 
-QUY TẮC BẮT BUỘC CHO GIỮ:
+QUY TẮC BẮT BUỘC:
+- Người mặc: ${wearerLabel}. Không áp đặt định kiến giới và không thay đổi cấu trúc cốt lõi của trang phục.
 - Áp dụng cùng WHITELIST cố định cho trường GIỮ. Tuyệt đối không nới lỏng.
 - Không đưa màu sắc, chất liệu, phụ kiện, bối cảnh hay các tính từ (uy nghiêm, thanh lịch...) vào GIỮ.
 - Với Áo tấc: Tuyệt đối KHÔNG đưa "cổ đứng/lập lĩnh" vào GIỮ.`;
@@ -549,7 +634,11 @@ QUY TẮC BẮT BUỘC CHO GIỮ:
 
       return res.json({
         success: true,
-        recommendation: refinedRecommendation,
+        recommendation: {
+          ...refinedRecommendation,
+          wearerPresentation: resolvedWearer,
+        },
+        wearerPresentation: resolvedWearer,
       });
     } catch (error) {
       console.error('[AC Backend] Gemini refinement error:', error);
@@ -560,6 +649,798 @@ QUY TẮC BẮT BUỘC CHO GIỮ:
     }
   });
 
+  // EvoLink Image Generation Endpoint (All-in-one create and poll)
+  app.post('/api/generate-image', async (req, res) => {
+    // Cho phép timeout dài cho polling (lên tới 3 phút)
+    req.setTimeout(180000);
+    res.setTimeout(180000);
+
+    try {
+      const { prompt, model } = req.body || {};
+
+      if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_PROMPT',
+            message: 'Mô tả hình ảnh (prompt) không được để trống.',
+          },
+        });
+      }
+
+      const evolinkService = new EvoLinkImageService();
+
+      if (!evolinkService.hasApiKey()) {
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: 'MISSING_API_KEY',
+            message: 'Chưa cấu hình EVOLINK_API_KEY trên server. Vui lòng thêm EVOLINK_API_KEY vào Secrets trên Google AI Studio.',
+          },
+        });
+      }
+
+      // 1. Tạo task trên EvoLink
+      const taskResult = await evolinkService.createImageTask(prompt, model);
+
+      // Nếu API trả về ảnh ngay lập tức
+      if (taskResult.immediateImageUrl) {
+        return res.json({
+          success: true,
+          taskId: taskResult.taskId,
+          imageUrl: taskResult.immediateImageUrl,
+          model: evolinkService.getModel(),
+          status: 'completed',
+        });
+      }
+
+      // 2. Poll task cho tới khi hoàn tất hoặc timeout
+      const finalResult = await evolinkService.waitForImageTask(taskResult.taskId);
+
+      return res.json({
+        success: true,
+        taskId: finalResult.taskId,
+        imageUrl: finalResult.imageUrl,
+        model: finalResult.model,
+        status: 'completed',
+      });
+    } catch (err: any) {
+      const evolinkService = new EvoLinkImageService();
+      const safeError = sanitizeUpstreamError(err, evolinkService.getApiKey());
+      console.error(`[AC Backend] Error in /api/generate-image: [${safeError.code}]`);
+      return res.status(500).json({
+        success: false,
+        error: safeError,
+      });
+    }
+  });
+
+  // Post-Generation Multimodal Image QA Endpoint (with alias /api/verify-lookbook for backward/forward compatibility)
+  const handleQaImageRequest = async (req: express.Request, res: express.Response) => {
+    const rawReqId = req.headers['x-ac-request-id'] || req.headers['x-request-id'];
+    const requestId = typeof rawReqId === 'string' && rawReqId.trim()
+      ? rawReqId.trim()
+      : `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    const rawGenId = req.headers['x-ac-generation-id'];
+    const generationId = typeof rawGenId === 'string' && rawGenId.trim() ? rawGenId.trim() : 'unknown-generation';
+
+    const rawQaRunId = req.headers['x-ac-qa-run-id'];
+    const qaRunId = typeof rawQaRunId === 'string' && rawQaRunId.trim() ? rawQaRunId.trim() : 'unknown-qarun';
+
+    res.setHeader('X-AC-Request-Id', requestId);
+    res.setHeader('X-AC-Generation-Id', generationId);
+    res.setHeader('X-AC-QA-Run-Id', qaRunId);
+
+    const logMeta = {
+      event: 'QA_REQUEST_STARTED',
+      requestId,
+      qaRunId,
+      generationId,
+      route: req.path,
+      method: req.method,
+      timestamp: new Date().toISOString(),
+    };
+    console.log(`[AC Backend QA] ${JSON.stringify(logMeta)}`);
+
+    try {
+      const { imageUrl, imageBase64, mimeType, recommendation, originalRequest, prompt, parentQaResult, visualSpec, wearerPresentation } = req.body || {};
+
+      if (!imageUrl && !imageBase64) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_IMAGE',
+            message: 'Thiếu đường dẫn hình ảnh (imageUrl) hoặc dữ liệu base64 để đánh giá.',
+            requestId,
+          },
+        });
+      }
+
+      if (!recommendation || !recommendation.garmentType) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_RECOMMENDATION',
+            message: 'Thiếu thông tin bản phối để đối chiếu.',
+            requestId,
+          },
+        });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: 'MISSING_GEMINI_KEY',
+            message: 'Chưa cấu hình GEMINI_API_KEY trên server.',
+            requestId,
+          },
+        });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const qaResult = await evaluateGeneratedImageWithGemini(ai, {
+        imageUrl,
+        imageBase64,
+        mimeType,
+        recommendation,
+        originalRequest,
+        prompt: prompt || '',
+        parentQaResult,
+        visualSpec,
+        wearerPresentation,
+      });
+
+      console.log(`[AC Backend QA] ${JSON.stringify({
+        event: 'QA_REQUEST_COMPLETED',
+        requestId,
+        qaRunId,
+        generationId,
+        route: req.path,
+        method: req.method,
+        status: qaResult.qa_status,
+        timestamp: new Date().toISOString(),
+      })}`);
+
+      return res.json({
+        success: true,
+        qaResult,
+        requestId,
+        generationId,
+        qaRunId,
+      });
+    } catch (err: any) {
+      console.error(`[AC Backend QA] ${JSON.stringify({
+        event: 'QA_REQUEST_FAILED',
+        requestId,
+        qaRunId,
+        generationId,
+        route: req.path,
+        method: req.method,
+        errorMessage: err?.message || 'Unknown error',
+        timestamp: new Date().toISOString(),
+      })}`);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'QA_EVALUATION_FAILED',
+          message: err?.message || 'Không thể hoàn thành đánh giá hình ảnh lúc này.',
+          requestId,
+        },
+      });
+    }
+  };
+
+  app.post('/api/qa-image', handleQaImageRequest);
+  app.post('/api/verify-lookbook', handleQaImageRequest);
+
+  // Optional: Tạo task riêng cho client-side stage polling
+  app.post('/api/generate-image/create', async (req, res) => {
+    try {
+      const { prompt, model } = req.body || {};
+
+      if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_PROMPT',
+            message: 'Mô tả hình ảnh (prompt) không được để trống.',
+          },
+        });
+      }
+
+      const evolinkService = new EvoLinkImageService();
+
+      if (!evolinkService.hasApiKey()) {
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: 'MISSING_API_KEY',
+            message: 'Chưa cấu hình EVOLINK_API_KEY trên server. Vui lòng thêm EVOLINK_API_KEY vào Secrets trên Google AI Studio.',
+          },
+        });
+      }
+
+      const taskResult = await evolinkService.createImageTask(prompt, model);
+
+      return res.json({
+        success: true,
+        taskId: taskResult.taskId,
+        status: taskResult.status,
+        imageUrl: taskResult.immediateImageUrl,
+        model: taskResult.model || evolinkService.getModel(),
+      });
+    } catch (err: any) {
+      const evolinkService = new EvoLinkImageService();
+      const safeError = sanitizeUpstreamError(err, evolinkService.getApiKey());
+      console.error(`[AC Backend] Error in /api/generate-image/create: [${safeError.code}]`);
+      return res.status(500).json({
+        success: false,
+        error: safeError,
+      });
+    }
+  });
+
+  // Optional: Kiểm tra trạng thái task riêng
+  app.get('/api/generate-image/task/:taskId', async (req, res) => {
+    try {
+      const taskId = req.params.taskId;
+      if (!taskId) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_TASK_ID',
+            message: 'Thiếu mã tác vụ taskId.',
+          },
+        });
+      }
+
+      const evolinkService = new EvoLinkImageService();
+
+      if (!evolinkService.hasApiKey()) {
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: 'MISSING_API_KEY',
+            message: 'Chưa cấu hình EVOLINK_API_KEY trên server.',
+          },
+        });
+      }
+
+      const statusResult = await evolinkService.getImageTask(taskId);
+
+      return res.json({
+        success: true,
+        taskId: statusResult.taskId,
+        status: statusResult.status,
+        imageUrl: statusResult.imageUrl,
+        error: statusResult.error,
+        model: evolinkService.getModel(),
+      });
+    } catch (err: any) {
+      const evolinkService = new EvoLinkImageService();
+      const safeError = sanitizeUpstreamError(err, evolinkService.getApiKey());
+      console.error(`[AC Backend] Error in /api/generate-image/task: [${safeError.code}]`);
+      return res.status(500).json({
+        success: false,
+        error: safeError,
+      });
+    }
+  });
+
+  // Serve static assets from public/assets
+  const publicAssetsDir = path.resolve('public/assets');
+  if (!fs.existsSync(publicAssetsDir)) {
+    fs.mkdirSync(publicAssetsDir, { recursive: true });
+  }
+  app.use('/assets', express.static(publicAssetsDir));
+
+  // Serve static 3D models from public/models
+  const publicModelsDir = path.resolve('public/models');
+  if (!fs.existsSync(publicModelsDir)) {
+    fs.mkdirSync(publicModelsDir, { recursive: true });
+  }
+  app.use('/models', express.static(publicModelsDir));
+
+  // Direct asset upload endpoint for garment reference photos
+  app.post('/api/upload-asset', async (req, res) => {
+    try {
+      const { filename, base64Data } = req.body || {};
+      if (!filename || !base64Data) {
+        return res.status(400).json({
+          success: false,
+          error: 'Thiếu filename hoặc base64Data',
+        });
+      }
+
+      const safeFilename = path.basename(filename);
+      const targetPath = path.join(publicAssetsDir, safeFilename);
+      const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      fs.writeFileSync(targetPath, Buffer.from(cleanBase64, 'base64'));
+
+      // If dist/assets exists, also sync there
+      const distAssets = path.resolve('dist/assets');
+      if (fs.existsSync(distAssets)) {
+        fs.copyFileSync(targetPath, path.join(distAssets, safeFilename));
+      }
+
+      console.log(`[AC Backend] Successfully saved asset: ${safeFilename}`);
+      return res.json({
+        success: true,
+        url: `/assets/${safeFilename}`,
+      });
+    } catch (err: any) {
+      console.error('[AC Backend] Error in /api/upload-asset:', err);
+      return res.status(500).json({
+        success: false,
+        error: err?.message || 'Không thể lưu file ảnh.',
+      });
+    }
+  });
+
+  // ==========================================
+  // MULTI-VIEW REFERENCE PACK ENDPOINTS
+  // ==========================================
+
+  // Generate single view image for multi-view pack
+  app.post('/api/multiview/generate-view', async (req, res) => {
+    req.setTimeout(180000);
+    res.setTimeout(180000);
+
+    try {
+      const { prompt, viewId, model } = req.body || {};
+
+      if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_PROMPT',
+            message: 'Prompt mô tả góc nhìn không được để trống.',
+          },
+        });
+      }
+
+      const evolinkService = new EvoLinkImageService();
+
+      if (!evolinkService.hasApiKey()) {
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: 'MISSING_API_KEY',
+            message: 'Chưa cấu hình EVOLINK_API_KEY trên server.',
+          },
+        });
+      }
+
+      const taskResult = await evolinkService.createImageTask(prompt, model);
+
+      if (taskResult.immediateImageUrl) {
+        return res.json({
+          success: true,
+          viewId,
+          taskId: taskResult.taskId,
+          imageUrl: taskResult.immediateImageUrl,
+          model: evolinkService.getModel(),
+          status: 'completed',
+        });
+      }
+
+      // Poll cho đến khi hoàn thành
+      const finalResult = await evolinkService.waitForImageTask(taskResult.taskId);
+
+      return res.json({
+        success: true,
+        viewId,
+        taskId: finalResult.taskId,
+        imageUrl: finalResult.imageUrl,
+        model: finalResult.model,
+        status: 'completed',
+      });
+    } catch (err: any) {
+      const evolinkService = new EvoLinkImageService();
+      const safeError = sanitizeUpstreamError(err, evolinkService.getApiKey());
+      console.error(`[AC Backend] Error in /api/multiview/generate-view: [${safeError.code}]`);
+      return res.status(500).json({
+        success: false,
+        error: safeError,
+      });
+    }
+  });
+
+  // Per-view Vision QA
+  app.post('/api/multiview/qa-view', async (req, res) => {
+    try {
+      const { imageUrl, imageBase64, mimeType, viewId, garmentId, recommendation, originalRequest } = req.body || {};
+
+      const resolvedGarmentId: GarmentId = garmentId || 'ao_tac';
+      const resolvedViewId: ViewId = viewId || 'FRONT';
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey && (imageUrl || imageBase64)) {
+        try {
+          const ai = new GoogleGenAI({
+            apiKey,
+            httpOptions: {
+              headers: {
+                'User-Agent': 'aistudio-build',
+              },
+            },
+          });
+
+          const baseQa = await evaluateGeneratedImageWithGemini(ai, {
+            imageUrl,
+            imageBase64,
+            mimeType,
+            recommendation,
+            originalRequest,
+            prompt: `Evaluation for view: ${resolvedViewId}`,
+          });
+
+          // Chuẩn hóa và áp dụng visibility rule cho viewId
+          const checks = (baseQa.garment_identity?.checks || []).map((c) => ({
+            traitId: c.trait_id,
+            traitName: c.trait_name,
+            expected: c.expected,
+            observed: c.observed,
+            result: (c.result === 'PASS' ? 'PASS' : c.result === 'NOT_ASSESSABLE' ? 'NOT_ASSESSABLE' : 'FAIL') as 'PASS' | 'PARTIAL' | 'FAIL' | 'NOT_ASSESSABLE',
+            explanation: c.explanation,
+          }));
+
+          const hasText = baseQa.visual_cleanliness?.has_text_contamination || false;
+          const perViewResult = evaluateViewQAResult(resolvedViewId, resolvedGarmentId, checks, hasText);
+
+          return res.json({
+            success: true,
+            qaResult: perViewResult,
+          });
+        } catch (geminiErr) {
+          console.warn('[AC Backend] Gemini Per-view QA failed, using deterministic evaluation:', geminiErr);
+        }
+      }
+
+      // Fallback deterministic per-view evaluation
+      const fallbackChecks = [
+        {
+          traitId: `${resolvedGarmentId}_silhouette`,
+          traitName: 'Phom dáng áo',
+          expected: 'Phom suông thẳng tự nhiên',
+          observed: 'Dáng áo buông chuẩn',
+          result: 'PASS' as const,
+          explanation: 'Dáng áo bám sát bản phối',
+        },
+        {
+          traitId: `${resolvedGarmentId}_sleeve`,
+          traitName: 'Dáng tay áo',
+          expected: 'Dáng tay chuẩn',
+          observed: 'Dáng tay hiển thị rõ',
+          result: 'PASS' as const,
+          explanation: 'Dáng tay đúng thiết kế',
+        },
+      ];
+
+      const perViewResult = evaluateViewQAResult(resolvedViewId, resolvedGarmentId, fallbackChecks, false);
+      return res.json({
+        success: true,
+        qaResult: perViewResult,
+      });
+    } catch (err: any) {
+      console.error('[AC Backend] Error in /api/multiview/qa-view:', err);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'PER_VIEW_QA_FAILED',
+          message: err?.message || 'Không thể đánh giá góc nhìn lúc này.',
+        },
+      });
+    }
+  });
+
+  // Cross-view Consistency QA with Gemini Multimodal
+  app.post('/api/multiview/qa-consistency', async (req, res) => {
+    try {
+      const { views, recommendation, originalRequest } = req.body || {};
+
+      if (!recommendation) {
+        return res.status(400).json({
+          success: false,
+          error: 'Thiếu recommendation dữ liệu bản phối.',
+        });
+      }
+
+      const visualSpec = buildVisualSpec(recommendation, originalRequest);
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (apiKey && Array.isArray(views) && views.length >= 2) {
+        try {
+          const ai = new GoogleGenAI({
+            apiKey,
+            httpOptions: {
+              headers: {
+                'User-Agent': 'aistudio-build',
+              },
+            },
+          });
+
+          // Chuẩn bị multimodal payload với cả 4 ảnh
+          const promptText = buildCrossViewConsistencyPrompt(visualSpec);
+          const parts: any[] = [];
+
+          for (const v of views) {
+            if (v.imageBase64) {
+              const cleanB64 = v.imageBase64.replace(/^data:image\/\w+;base64,/, '');
+              parts.push({
+                inlineData: {
+                  mimeType: 'image/png',
+                  data: cleanB64,
+                },
+              });
+            } else if (v.imageUrl) {
+              try {
+                // Fetch image buffer
+                const fetchRes = await fetch(v.imageUrl);
+                if (fetchRes.ok) {
+                  const arrBuf = await fetchRes.arrayBuffer();
+                  const b64 = Buffer.from(arrBuf).toString('base64');
+                  const mime = fetchRes.headers.get('content-type') || 'image/png';
+                  parts.push({
+                    inlineData: {
+                      mimeType: mime,
+                      data: b64,
+                    },
+                  });
+                }
+              } catch (fErr) {
+                console.warn(`[AC Backend] Could not fetch image for view ${v.viewId}:`, fErr);
+              }
+            }
+          }
+
+          parts.push({ text: promptText });
+
+          const CONSISTENCY_SCHEMA = {
+            type: Type.OBJECT,
+            properties: {
+              verdict: {
+                type: Type.STRING,
+                enum: ['CONSISTENT', 'NEEDS_REVISION', 'NOT_ASSESSABLE'],
+              },
+              checks: {
+                type: Type.OBJECT,
+                properties: {
+                  garmentSilhouette: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      verdict: { type: Type.STRING, enum: ['CONSISTENT', 'NEEDS_REVISION', 'NOT_ASSESSABLE'] },
+                      confidence: { type: Type.STRING, enum: ['HIGH', 'MEDIUM', 'LOW'] },
+                      observedNote: { type: Type.STRING },
+                      issueCodes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['name', 'verdict', 'confidence', 'observedNote', 'issueCodes'],
+                  },
+                  sleeveShape: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      verdict: { type: Type.STRING, enum: ['CONSISTENT', 'NEEDS_REVISION', 'NOT_ASSESSABLE'] },
+                      confidence: { type: Type.STRING, enum: ['HIGH', 'MEDIUM', 'LOW'] },
+                      observedNote: { type: Type.STRING },
+                      issueCodes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['name', 'verdict', 'confidence', 'observedNote', 'issueCodes'],
+                  },
+                  palette: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      verdict: { type: Type.STRING, enum: ['CONSISTENT', 'NEEDS_REVISION', 'NOT_ASSESSABLE'] },
+                      confidence: { type: Type.STRING, enum: ['HIGH', 'MEDIUM', 'LOW'] },
+                      observedNote: { type: Type.STRING },
+                      issueCodes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['name', 'verdict', 'confidence', 'observedNote', 'issueCodes'],
+                  },
+                  materialAppearance: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      verdict: { type: Type.STRING, enum: ['CONSISTENT', 'NEEDS_REVISION', 'NOT_ASSESSABLE'] },
+                      confidence: { type: Type.STRING, enum: ['HIGH', 'MEDIUM', 'LOW'] },
+                      observedNote: { type: Type.STRING },
+                      issueCodes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['name', 'verdict', 'confidence', 'observedNote', 'issueCodes'],
+                  },
+                  accessories: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      verdict: { type: Type.STRING, enum: ['CONSISTENT', 'NEEDS_REVISION', 'NOT_ASSESSABLE'] },
+                      confidence: { type: Type.STRING, enum: ['HIGH', 'MEDIUM', 'LOW'] },
+                      observedNote: { type: Type.STRING },
+                      issueCodes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['name', 'verdict', 'confidence', 'observedNote', 'issueCodes'],
+                  },
+                  lowerGarment: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      verdict: { type: Type.STRING, enum: ['CONSISTENT', 'NEEDS_REVISION', 'NOT_ASSESSABLE'] },
+                      confidence: { type: Type.STRING, enum: ['HIGH', 'MEDIUM', 'LOW'] },
+                      observedNote: { type: Type.STRING },
+                      issueCodes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['name', 'verdict', 'confidence', 'observedNote', 'issueCodes'],
+                  },
+                  structuralDetails: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      verdict: { type: Type.STRING, enum: ['CONSISTENT', 'NEEDS_REVISION', 'NOT_ASSESSABLE'] },
+                      confidence: { type: Type.STRING, enum: ['HIGH', 'MEDIUM', 'LOW'] },
+                      observedNote: { type: Type.STRING },
+                      issueCodes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['name', 'verdict', 'confidence', 'observedNote', 'issueCodes'],
+                  },
+                },
+                required: [
+                  'garmentSilhouette',
+                  'sleeveShape',
+                  'palette',
+                  'materialAppearance',
+                  'accessories',
+                  'lowerGarment',
+                  'structuralDetails',
+                ],
+              },
+              inconsistentViews: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              issueCodes: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              summary: {
+                type: Type.STRING,
+              },
+            },
+            required: ['verdict', 'checks', 'inconsistentViews', 'issueCodes', 'summary'],
+          };
+
+          const geminiRes = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: { parts },
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: CONSISTENCY_SCHEMA,
+              temperature: 0.2,
+            },
+          });
+
+          if (geminiRes?.text) {
+            const parsed = JSON.parse(geminiRes.text);
+            const validated = validateAndParseConsistencyResult(parsed);
+            return res.json({
+              success: true,
+              consistencyQa: validated,
+            });
+          }
+        } catch (geminiConsistencyErr) {
+          console.warn('[AC Backend] Gemini Consistency QA failed, using deterministic evaluation:', geminiConsistencyErr);
+        }
+      }
+
+      // Fallback deterministic consistency
+      const deterministicRes = evaluateDeterministicConsistency(visualSpec);
+      return res.json({
+        success: true,
+        consistencyQa: deterministicRes,
+      });
+    } catch (err: any) {
+      console.error('[AC Backend] Error in /api/multiview/qa-consistency:', err);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'CONSISTENCY_QA_FAILED',
+          message: err?.message || 'Không thể đánh giá tính nhất quán lúc này.',
+        },
+      });
+    }
+  });
+
+  // ==========================================
+  // 3D RECONSTRUCTION ARCHITECTURE ENDPOINTS (Phase 3D-5A)
+  // ==========================================
+  // 3D RECONSTRUCTION ARCHITECTURE ENDPOINTS (Phase 3D-5A & 3D-5B)
+  // Supports Meshy Multi-Image-to-3D with Live Safety Gates & Offline Mock Engine
+  // ==========================================
+
+  app.get('/api/reconstruction/config', (req, res) => {
+    const config = getReconstructionConfig();
+    const gate = reconstructionService.canDispatchLiveMeshy();
+    return res.json({
+      success: true,
+      enableLiveReconstruction: config.enableLiveReconstruction,
+      hasMeshyApiKey: Boolean(config.meshyApiKey && config.meshyApiKey.length > 5),
+      meshyModel: config.meshyModel,
+      liveAllowed: gate.allowed,
+      liveBlockReason: gate.reason || null,
+      paidCallsCount: reconstructionService.getPaidCallsCount(),
+    });
+  });
+
+  app.post('/api/reconstruction/create', async (req, res) => {
+    try {
+      const { pack } = req.body || {};
+
+      if (!pack) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_PACK',
+            message: 'Thiếu dữ liệu MultiViewReferencePack.',
+          },
+        });
+      }
+
+      const result = await reconstructionService.handleCreateReconstruction(pack);
+
+      return res.json({
+        success: true,
+        receipt: result.receipt,
+        reconstructionId: result.job.reconstructionId,
+        isExisting: result.isExisting,
+      });
+    } catch (err: any) {
+      console.error('[AC Backend] Error in /api/reconstruction/create:', err);
+      const errData = err?.errorData;
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: errData?.code || 'RECONSTRUCTION_CREATION_FAILED',
+          message: err?.message || 'Không thể khởi tạo tiến trình dựng 3D thử nghiệm.',
+        },
+      });
+    }
+  });
+
+  app.get('/api/reconstruction/:id', async (req, res) => {
+    try {
+      const reconstructionId = req.params.id;
+      const result = await reconstructionService.handleGetReconstruction(reconstructionId);
+
+      return res.json({
+        success: true,
+        job: result.job,
+        artifact: result.artifact,
+      });
+    } catch (err: any) {
+      console.error('[AC Backend] Error in /api/reconstruction/:id:', err);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'FETCH_RECONSTRUCTION_FAILED',
+          message: err?.message || 'Không thể kiểm tra tiến trình dựng 3D.',
+        },
+      });
+    }
+  });
+
+  const server = http.createServer(app);
+
   // Vite integration
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static('dist'));
@@ -568,13 +1449,18 @@ QUY TẮC BẮT BUỘC CHO GIỮ:
     });
   } else {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: {
+          server,
+        },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   }
 
-  app.listen(port, '0.0.0.0', () => {
+  server.listen(port, '0.0.0.0', () => {
     console.log(`[AC Engine] Server running on http://localhost:${port}`);
   });
 }

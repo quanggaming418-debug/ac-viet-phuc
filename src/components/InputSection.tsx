@@ -1,6 +1,15 @@
-import React, { useState } from 'react';
-import { ArrowRight, RotateCcw, AlertCircle, RefreshCw } from 'lucide-react';
-import { ACOutfitRecommendation, OriginalRequest } from '../types/recommendation.ts';
+import React from 'react';
+import { RotateCcw, ArrowRight } from 'lucide-react';
+import {
+  UserIntent,
+  WearerPresentation,
+} from '../types/recommendation.ts';
+
+const WEARER_OPTIONS: { value: WearerPresentation; label: string }[] = [
+  { value: 'male', label: 'Nam' },
+  { value: 'female', label: 'Nữ' },
+  { value: 'unspecified', label: 'Không ưu tiên' },
+];
 
 const OCCASIONS = [
   'Tết',
@@ -19,82 +28,82 @@ const STYLES = [
   'Cá tính'
 ];
 
-interface InputSectionProps {
-  onRecommendationReceived: (
-    recommendation: ACOutfitRecommendation,
-    originalRequest: OriginalRequest
-  ) => void;
+export interface InputSectionProps {
+  userIntent: UserIntent;
+  onIntentChange: (intent: UserIntent) => void;
+  onSubmit: (intent: UserIntent) => void;
   isLoading: boolean;
-  setIsLoading: (loading: boolean) => void;
   errorMessage: string | null;
   setErrorMessage: (msg: string | null) => void;
 }
 
 export function InputSection({
-  onRecommendationReceived,
+  userIntent,
+  onIntentChange,
+  onSubmit,
   isLoading,
-  setIsLoading,
   errorMessage,
   setErrorMessage,
 }: InputSectionProps) {
-  const [prompt, setPrompt] = useState('');
-  const [selectedOccasion, setSelectedOccasion] = useState<string>('Tết');
-  const [selectedStyle, setSelectedStyle] = useState<string>('Thanh lịch');
-  const [modernity, setModernity] = useState<number>(50);
+  const handleWearerSelect = (wearer: WearerPresentation) => {
+    onIntentChange({
+      ...userIntent,
+      wearerPresentation: wearer,
+    });
+  };
 
-  const executeSubmit = async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const handleOccasionSelect = (occasion: string) => {
+    onIntentChange({
+      ...userIntent,
+      occasion,
+    });
+  };
 
-    const requestPayload: OriginalRequest = {
-      userText: prompt.trim(),
-      occasion: selectedOccasion,
-      style: selectedStyle,
-      modernityLevel: modernity,
-    };
+  const handleStyleSelect = (style: string) => {
+    onIntentChange({
+      ...userIntent,
+      style,
+    });
+  };
 
-    try {
-      const response = await fetch('/api/recommend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestPayload),
-      });
+  const handleModernityChange = (modernityLevel: number) => {
+    onIntentChange({
+      ...userIntent,
+      modernityLevel,
+    });
+  };
 
-      const data = await response.json();
-
-      if (response.ok && data.success && data.recommendation) {
-        onRecommendationReceived(data.recommendation, requestPayload);
-        // Smooth scroll to result section
-        setTimeout(() => {
-          const resultElement = document.getElementById('result-section');
-          if (resultElement) {
-            resultElement.scrollIntoView({ behavior: 'smooth' });
-          }
-        }, 150);
-      } else {
-        setErrorMessage('AC chưa thể tạo bản phối lúc này. Hãy thử lại sau một chút.');
-      }
-    } catch (err) {
-      console.error('[AC Client] Error during recommendation request:', err);
-      setErrorMessage('AC chưa thể tạo bản phối lúc này. Hãy thử lại sau một chút.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleTextChange = (userText: string) => {
+    onIntentChange({
+      ...userIntent,
+      userText,
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    executeSubmit();
+    setErrorMessage(null);
+    onSubmit(userIntent);
   };
 
   const handleReset = () => {
-    setPrompt('');
-    setSelectedOccasion('Tết');
-    setSelectedStyle('Thanh lịch');
-    setModernity(50);
+    onIntentChange({
+      userText: '',
+      wearerPresentation: 'unspecified',
+      occasion: 'Tết',
+      style: 'Thanh lịch',
+      modernityLevel: 50,
+    });
     setErrorMessage(null);
   };
+
+  const hasNonDefaultInputs =
+    userIntent.userText.trim() !== '' ||
+    userIntent.wearerPresentation !== 'unspecified' ||
+    userIntent.occasion !== 'Tết' ||
+    userIntent.style !== 'Thanh lịch' ||
+    userIntent.modernityLevel !== 50;
 
   return (
     <section id="input-section" className="py-16 sm:py-24 relative scroll-mt-20">
@@ -120,7 +129,7 @@ export function InputSection({
             <span className="text-xs font-semibold uppercase tracking-wider text-[#77736E]">
               Thông tin gợi ý
             </span>
-            {(prompt || selectedOccasion !== 'Tết' || selectedStyle !== 'Thanh lịch' || modernity !== 50) && (
+            {hasNonDefaultInputs && (
               <button
                 type="button"
                 onClick={handleReset}
@@ -133,7 +142,7 @@ export function InputSection({
             )}
           </div>
 
-          {/* Natural Prompt Textarea */}
+          {/* 1. Natural Prompt Textarea (description) */}
           <div className="space-y-2.5">
             <label 
               htmlFor="prompt-input" 
@@ -145,8 +154,8 @@ export function InputSection({
               <textarea
                 id="prompt-input"
                 rows={4}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                value={userIntent.userText}
+                onChange={(e) => handleTextChange(e.target.value)}
                 disabled={isLoading}
                 placeholder="Tết này mình muốn chụp ảnh, thích màu sáng, trẻ trung nhưng vẫn muốn giữ khá rõ nét truyền thống..."
                 className="w-full rounded-[16px] bg-[#FBFBFA] border border-[#E9E6E1] p-4 text-base text-[#181716] placeholder:text-[#77736E]/60 focus:outline-hidden focus:border-[#C6A56B] focus:bg-[#FFFFFF] transition-all resize-none leading-relaxed disabled:opacity-70"
@@ -154,25 +163,56 @@ export function InputSection({
             </div>
           </div>
 
-          {/* Dịp (Occasion Chips) */}
+          {/* 2. NGƯỜI MẶC (Wearer presentation chips - faint brick-red / pastel, NEVER black fill) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#77736E] uppercase tracking-wider">
+                Người mặc
+              </span>
+              <span className="text-xs text-[#77736E]/80">
+                {WEARER_OPTIONS.find((w) => w.value === userIntent.wearerPresentation)?.label || 'Không ưu tiên'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:gap-2.5">
+              {WEARER_OPTIONS.map((opt) => {
+                const isSelected = userIntent.wearerPresentation === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleWearerSelect(opt.value)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#8E3028]/10 text-[#8E3028] border border-[#8E3028]/40 shadow-xs font-semibold'
+                        : 'bg-[#FBFBFA] text-[#77736E] border border-[#E9E6E1] hover:text-[#181716] hover:border-[#181716]/30'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. Dịp (Occasion Chips) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#77736E] uppercase tracking-wider">
                 Dịp
               </span>
               <span className="text-xs text-[#77736E]/80">
-                {selectedOccasion}
+                {userIntent.occasion}
               </span>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-2.5">
               {OCCASIONS.map((occ) => {
-                const isSelected = selectedOccasion === occ;
+                const isSelected = userIntent.occasion === occ;
                 return (
                   <button
                     key={occ}
                     type="button"
                     disabled={isLoading}
-                    onClick={() => setSelectedOccasion(occ)}
+                    onClick={() => handleOccasionSelect(occ)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer disabled:opacity-60 ${
                       isSelected
                         ? 'bg-[#181716] text-[#FFFFFF] border border-[#181716] shadow-xs'
@@ -186,25 +226,25 @@ export function InputSection({
             </div>
           </div>
 
-          {/* Phong cách (Style Chips) */}
+          {/* 4. Phong cách (Style Chips) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#77736E] uppercase tracking-wider">
                 Phong cách
               </span>
               <span className="text-xs text-[#77736E]/80">
-                {selectedStyle}
+                {userIntent.style}
               </span>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-2.5">
               {STYLES.map((sty) => {
-                const isSelected = selectedStyle === sty;
+                const isSelected = userIntent.style === sty;
                 return (
                   <button
                     key={sty}
                     type="button"
                     disabled={isLoading}
-                    onClick={() => setSelectedStyle(sty)}
+                    onClick={() => handleStyleSelect(sty)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer disabled:opacity-60 ${
                       isSelected
                         ? 'bg-[#181716] text-[#FFFFFF] border border-[#181716] shadow-xs'
@@ -218,16 +258,16 @@ export function InputSection({
             </div>
           </div>
 
-          {/* Slider: Truyền thống hơn ←→ Hiện đại hơn */}
+          {/* 5. Slider: Truyền thống hơn ←→ Hiện đại hơn */}
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between text-xs font-medium text-[#77736E]">
-              <span className={modernity <= 40 ? 'text-[#181716] font-semibold' : ''}>
+              <span className={userIntent.modernityLevel <= 40 ? 'text-[#181716] font-semibold' : ''}>
                 Truyền thống hơn
               </span>
               <span className="text-[11px] text-[#77736E]/60 tracking-wider">
-                {modernity === 50 ? 'Cân bằng' : modernity < 50 ? `${100 - modernity}% truyền thống` : `${modernity}% hiện đại`}
+                {userIntent.modernityLevel === 50 ? 'Cân bằng' : userIntent.modernityLevel < 50 ? `${100 - userIntent.modernityLevel}% truyền thống` : `${userIntent.modernityLevel}% hiện đại`}
               </span>
-              <span className={modernity >= 60 ? 'text-[#181716] font-semibold' : ''}>
+              <span className={userIntent.modernityLevel >= 60 ? 'text-[#181716] font-semibold' : ''}>
                 Hiện đại hơn
               </span>
             </div>
@@ -236,18 +276,19 @@ export function InputSection({
                 type="range"
                 min="0"
                 max="100"
-                value={modernity}
+                value={userIntent.modernityLevel}
                 disabled={isLoading}
-                onChange={(e) => setModernity(parseInt(e.target.value, 10))}
+                onChange={(e) => handleModernityChange(parseInt(e.target.value, 10))}
                 className="w-full cursor-pointer disabled:opacity-50"
                 aria-label="Mức độ truyền thống hoặc hiện đại"
               />
             </div>
           </div>
 
-          {/* CTA: Để AC gợi ý */}
+          {/* 6. CTA: Để AC gợi ý */}
           <div className="pt-2">
             <button
+              id="submit-recommendation-btn"
               type="submit"
               disabled={isLoading}
               className="w-full h-13 px-8 rounded-full bg-[#8E3028] hover:bg-[#782821] active:bg-[#68231c] text-[#FFFFFF] font-medium text-base transition-colors flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-85 shadow-xs"
@@ -258,37 +299,28 @@ export function InputSection({
                   <span>AC đang tìm bản phối phù hợp với bạn…</span>
                 </span>
               ) : (
-                <>
+                <span className="inline-flex items-center gap-2">
                   <span>Để AC gợi ý</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
+                  <ArrowRight className="w-4.5 h-4.5" />
+                </span>
               )}
             </button>
           </div>
-        </form>
 
-        {/* Friendly Error State */}
-        {errorMessage && (
-          <div className="mt-6 p-6 rounded-[22px] bg-[#FFFFFF] border border-[#E9E6E1] shadow-[0_4px_20px_rgba(24,23,22,0.03)] space-y-4 text-center sm:text-left">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-[#8E3028] shrink-0" />
-                <p className="text-sm font-medium text-[#181716]">
-                  {errorMessage}
-                </p>
-              </div>
+          {/* Error Message with friendly retry */}
+          {errorMessage && (
+            <div className="p-4 rounded-xl bg-red-50/80 border border-red-200/80 text-sm text-red-700 flex items-center justify-between gap-3">
+              <span>{errorMessage}</span>
               <button
                 type="button"
-                onClick={executeSubmit}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-[#181716] hover:bg-[#2b2927] text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
+                onClick={handleSubmit}
+                className="text-xs font-semibold underline hover:text-red-900 cursor-pointer shrink-0"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Thử lại</span>
+                Thử lại
               </button>
             </div>
-          </div>
-        )}
-
+          )}
+        </form>
       </div>
     </section>
   );
